@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.todo-conatiner {
+    max-width: 400px;
+    margin: 3rem auto;
+    text-align: center;
+    font-family: sans-serif;
+}
+
+.input-section{
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.input-section input {
+    width: 70%;
+    padding: 0.5rem;
+    font-size: 1rem;
+}
+
+.input-section button {
+    padding: 0.5rem 1rem;
+    margin-left: 0.5rem;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+
+.task-list{
+    list-style: none ;
+    padding: 0;
+}
+
+.task-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    border-bottom: 1px solid #ccc;
+}
+
+.empty-msg {
+    color: #777;
+    font-style: italic  ;
+}
