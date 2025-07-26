@@ -1,5 +1,5 @@
 {
-  "name": "todo",
+  "name": "simple-todo",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -10,8 +10,7 @@
     "framer-motion": "^12.23.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-scripts": "5.0.1",
-    "web-vi ls": "^2.1.4"
+    "react-scripts": "5.0.1"
   },
   "scripts": {
     "start": "react-scripts start",
