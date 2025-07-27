@@ -6,29 +6,15 @@ function TodoiOSStyleComplete() {
   const [editTask, setEditTask] = useState(null);
   const [editText, setEditText] = useState("");
   
-  const [taskList, setTaskList] = useState(() => {
-    const savedTasks = localStorage.getItem('todoTasks');
-    if (savedTasks) {
-      try {
-        return JSON.parse(savedTasks);
-      } catch (error) {
-        console.error('Error loading tasks:', error);
-        return [];
-      }
-    }
-    return [];
-  });
+  const [taskList, setTaskList] = useState([]);
   
   const [selectedCategory, setSelectedCategory] = useState("Health");
   const [showAddTask, setShowAddTask] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activeFooterTab, setActiveFooterTab] = useState('today');
-  const [showContent, setShowContent] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   
-  const [isDark, setIsDark] = useState(() => {
-    const savedTheme = localStorage.getItem('todoTheme');
-    return savedTheme ? JSON.parse(savedTheme) : false;
-  });
+  const [isDark, setIsDark] = useState(false);
 
   // Categories with colors and icons
   const categories = {
@@ -74,6 +60,12 @@ function TodoiOSStyleComplete() {
         ? { ...task, done: !task.done }
         : task
     ));
+    
+    // Show confetti when task is completed
+    if (!taskObj.done) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 3000);
+    }
   };
 
   const handleEdit = (taskObj) => {
@@ -93,6 +85,22 @@ function TodoiOSStyleComplete() {
     setEditText("");
   };
 
+  // Fix body background for full dark theme
+useEffect(() => {
+  if (isDark) {
+    document.body.style.backgroundColor = '#000000';
+    document.documentElement.style.backgroundColor = '#000000';
+  } else {
+    document.body.style.backgroundColor = '#F8F9FA';
+    document.documentElement.style.backgroundColor = '#F8F9FA';
+  }
+  
+  return () => {
+    document.body.style.backgroundColor = '';
+    document.documentElement.style.backgroundColor = '';
+  };
+}, [isDark]);
+
   // Real-time clock
   useEffect(() => {
     const timer = setInterval(() => {
@@ -100,16 +108,6 @@ function TodoiOSStyleComplete() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  // Save tasks to localStorage
-  useEffect(() => {
-    localStorage.setItem('todoTasks', JSON.stringify(taskList));
-  }, [taskList]);
-
-  // Save theme to localStorage
-  useEffect(() => {
-    localStorage.setItem('todoTheme', JSON.stringify(isDark));
-  }, [isDark]);
 
   // Get tasks by category
   const getTasksByCategory = (category) => {
@@ -131,329 +129,690 @@ function TodoiOSStyleComplete() {
     exit: { opacity: 0, x: 20 }
   };
 
-  // Render tab content with full functionality
+  // Confetti Component
+  const ConfettiEffect = () => {
+    const confettiPieces = Array.from({ length: 150 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 3,
+      duration: 2 + Math.random() * 2,
+      color: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'][Math.floor(Math.random() * 7)],
+      shape: Math.random() > 0.6 ? 'star' : Math.random() > 0.4 ? 'circle' : Math.random() > 0.2 ? 'square' : 'heart',
+      size : 10 + Math.random() * 12
+    }));
+
+    return (
+      <div style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        zIndex: 9999,
+        overflow: "hidden"
+      }}>
+        {confettiPieces.map(piece => (
+          <motion.div
+            key={piece.id}
+            initial={{ 
+              y: -10, 
+              x: `${piece.left}vw`, 
+              rotate: 0,
+              scale: 0
+            }}
+            animate={{ 
+              y: "100vh", 
+              rotate: 360,
+              scale: [0, 1, 1, 0]
+            }}
+            transition={{
+              duration: piece.duration,
+              delay: piece.delay,
+              ease: "easeOut"
+            }}
+            style={{
+              position: "absolute",
+              width: "10px",
+              height: "10px",
+              backgroundColor: piece.color,
+              borderRadius: Math.random() > 0.5 ? "50%" : "2px"
+            }}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  // Stats Component
+  const StatsView = () => (
+    <div style={{ 
+      padding: "20px", 
+      backgroundColor: theme.background,
+      color: theme.text,
+      minHeight: "100vh"
+    }}>
+      <div style={{ 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "center",
+        marginBottom: "30px"
+      }}>
+        <h2 style={{ 
+          fontSize: "32px", 
+          fontWeight: "700", 
+          margin: 0,
+          color: theme.text
+        }}>
+          📊 Statistics
+        </h2>
+        <button
+          onClick={() => setActiveFooterTab('today')}
+          style={{
+            background: "linear-gradient(135deg, #007AFF, #0051D2)",
+            border: "none",
+            fontSize: "16px",
+            color: "white",
+            cursor: "pointer",
+            padding: "10px 16px",
+            borderRadius: "12px",
+            fontWeight: "600"
+          }}
+        >
+          ← Back
+        </button>
+      </div>
+      
+      {/* Progress Bars */}
+      {Object.entries(categories).map(([category, config]) => {
+        const categoryTasks = getTasksByCategory(category);
+        const completed = categoryTasks.filter(t => t.done).length;
+        const total = categoryTasks.length;
+        const percentage = total > 0 ? (completed / total) * 100 : 0;
+        
+        return (
+          <div 
+            key={category} 
+            style={{ 
+              marginBottom: "20px",
+              padding: "16px",
+              backgroundColor: theme.cardBackground,
+              borderRadius: "16px",
+              border: `1px solid ${theme.border}`,
+              boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.3)" : "0 2px 12px rgba(0,0,0,0.1)"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
+              <span style={{ 
+                fontSize: "18px", 
+                fontWeight: "600", 
+                color: theme.text,
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}>
+                <span style={{ fontSize: "24px" }}>{config.icon}</span>
+                {category}
+              </span>
+              <span style={{ 
+                fontSize: "16px", 
+                color: theme.textSecondary,
+                fontWeight: "600"
+              }}>
+                {completed}/{total}
+              </span>
+            </div>
+            <div style={{
+              width: "100%",
+              height: "12px",
+              backgroundColor: isDark ? "#2C2C2E" : "#F0F0F0",
+              borderRadius: "6px",
+              overflow: "hidden",
+              position: "relative"
+            }}>
+              <div 
+                style={{
+                  width: `${percentage}%`,
+                  height: "100%",   
+                  background: `linear-gradient(90deg, ${config.color}, ${config.color}CC)`,
+                  borderRadius: "6px",
+                  position: "relative",
+                  transition: "width 0.5s ease"
+                }}
+              />
+              <span style={{
+                position: "absolute",
+                right: "8px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                fontSize: "10px",
+                fontWeight: "700",
+                color: percentage > 50 ? "white" : theme.text
+              }}>
+                {Math.round(percentage)}%
+              </span>
+            </div>
+          </div>
+        );
+      })}
+      
+      {/* Overall Stats */}
+      <div 
+        style={{
+          background: isDark 
+            ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
+            : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
+          borderRadius: "20px",
+          padding: "24px",
+          marginTop: "30px",
+          border: `1px solid ${theme.border}`,
+          boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.1)"
+        }}
+      >
+        <h3 style={{ 
+          fontSize: "24px", 
+          fontWeight: "700", 
+          marginBottom: "20px", 
+          color: theme.text,
+          textAlign: "center"
+        }}>
+          🏆 Overall Progress
+        </h3>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
+          <div style={{ textAlign: "center" }}>
+            <div 
+              style={{ 
+                fontSize: "36px", 
+                fontWeight: "700", 
+                color: "#007AFF",
+                marginBottom: "8px"
+              }}
+            >
+              {taskList.length}
+            </div>
+            <div style={{ fontSize: "14px", color: theme.textSecondary, fontWeight: "500" }}>Total Tasks</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div 
+              style={{ 
+                fontSize: "36px", 
+                fontWeight: "700", 
+                color: "#34C759",
+                marginBottom: "8px"
+              }}
+            >
+              {taskList.filter(t => t.done).length}
+            </div>
+            <div style={{ fontSize: "14px", color: theme.textSecondary, fontWeight: "500" }}>Completed</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div 
+              style={{ 
+                fontSize: "36px", 
+                fontWeight: "700", 
+                color: "#FF9500",
+                marginBottom: "8px"
+              }}
+            >
+              {Math.round(taskList.length > 0 ? (taskList.filter(t => t.done).length / taskList.length) * 100 : 0)}%
+            </div>
+            <div style={{ fontSize: "14px", color: theme.textSecondary, fontWeight: "500" }}>Success Rate</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Calendar View
+  const CalendarView = () => (
+    <div style={{ 
+      padding: "20px", 
+      backgroundColor: theme.background,
+      color: theme.text,
+      minHeight: "100vh"
+    }}>
+      <div style={{ 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "center",
+        marginBottom: "30px"
+      }}>
+        <h2 style={{ 
+          fontSize: "32px", 
+          fontWeight: "700", 
+          margin: 0,
+          color: theme.text
+        }}>
+          📆 Calendar
+        </h2>
+        <button
+          onClick={() => setActiveFooterTab('today')}
+          style={{
+            background: "linear-gradient(135deg, #007AFF, #0051D2)",
+            border: "none",
+            fontSize: "16px",
+            color: "white",
+            cursor: "pointer",
+            padding: "10px 16px",
+            borderRadius: "12px",
+            fontWeight: "600"
+          }}
+        >
+          ← Back
+        </button>
+      </div>
+      
+      {/* Calendar Header */}
+      <div 
+        style={{
+          background: isDark 
+            ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
+            : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
+          borderRadius: "20px",
+          padding: "24px",
+          marginBottom: "25px",
+          border: `1px solid ${theme.border}`,
+          boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.1)"
+        }}
+      >
+        <div style={{ textAlign: "center", marginBottom: "20px" }}>
+          <div style={{ 
+            fontSize: "28px", 
+            fontWeight: "700", 
+            color: theme.text,
+            marginBottom: "8px"
+          }}>
+            {currentTime.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </div>
+          <div style={{ 
+            fontSize: "16px", 
+            color: theme.textSecondary,
+            fontWeight: "500"
+          }}>
+            Today: {currentTime.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric' })}
+          </div>
+          <div style={{
+            fontSize: "24px",
+            fontWeight: "700",
+            color: "#007AFF",
+            marginTop: "8px"
+          }}>
+            {currentTime.toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            })}
+          </div>
+        </div>
+        
+        {/* Task Timeline */}
+        <div>
+          <h3 style={{ 
+            fontSize: "20px", 
+            fontWeight: "700", 
+            marginBottom: "16px", 
+            color: theme.text,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
+            ⏰ Recent Activity
+          </h3>
+          {taskList.length === 0 ? (
+            <div style={{ 
+              textAlign: "center", 
+              padding: "40px 20px",
+              color: theme.textSecondary 
+            }}>
+              <div style={{ fontSize: "48px", marginBottom: "16px" }}>📅</div>
+              <p style={{ fontSize: "18px", margin: "0", fontWeight: "500" }}>No tasks yet</p>
+              <p style={{ fontSize: "14px", margin: "8px 0 0 0" }}>Start creating tasks to see your activity</p>
+            </div>
+          ) : (
+            taskList.slice(0, 8).map((task, index) => (
+              <div 
+                key={task.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "12px 0",
+                  borderBottom: index < Math.min(taskList.length, 8) - 1 ? `1px solid ${theme.border}` : "none"
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1 }}>
+                  <span style={{ 
+                    fontSize: "16px",
+                    padding: "6px 10px",
+                    borderRadius: "8px",
+                    backgroundColor: categories[task.category]?.color,
+                    color: "white",
+                    fontWeight: "600",
+                    minWidth: "32px",
+                    textAlign: "center"
+                  }}>
+                    {categories[task.category]?.icon}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ 
+                      fontSize: "16px", 
+                      color: theme.text,
+                      fontWeight: "500",
+                      textDecoration: task.done ? "line-through" : "none",
+                      opacity: task.done ? 0.6 : 1
+                    }}>
+                      {task.text}
+                    </div>
+                    <div style={{ 
+                      fontSize: "12px", 
+                      color: theme.textSecondary,
+                      marginTop: "2px"
+                    }}>
+                      {task.category} • {new Date(task.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+                <div style={{
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "10px",
+                  backgroundColor: task.done ? "#34C759" : theme.border,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "white",
+                  fontSize: "12px",
+                  fontWeight: "700"
+                }}>
+                  {task.done && "✓"}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Settings View
+  const SettingsView = () => (
+    <div style={{ 
+      padding: "20px", 
+      backgroundColor: theme.background,
+      color: theme.text,
+      minHeight: "100vh"
+    }}>
+      <div style={{ 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "center",
+        marginBottom: "30px"
+      }}>
+        <h2 style={{ 
+          fontSize: "32px", 
+          fontWeight: "700", 
+          margin: 0,
+          color: theme.text
+        }}>
+          ⚙️ Settings
+        </h2>
+        <button
+          onClick={() => setActiveFooterTab('today')}
+          style={{
+            background: "linear-gradient(135deg, #007AFF, #0051D2)",
+            border: "none",
+            fontSize: "16px",
+            color: "white",
+            cursor: "pointer",
+            padding: "10px 16px",
+            borderRadius: "12px",
+            fontWeight: "600"
+          }}
+        >
+          ← Back
+        </button>
+      </div>
+      
+      {/* Theme Toggle */}
+      <div 
+        style={{
+          background: isDark 
+            ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
+            : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
+          borderRadius: "16px",
+          padding: "20px",
+          marginBottom: "20px",
+          border: `1px solid ${theme.border}`,
+          boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.1)"
+        }}
+      >
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center" 
+        }}>
+          <div>
+            <h3 style={{ 
+              fontSize: "18px", 
+              fontWeight: "600", 
+              marginBottom: "4px", 
+              color: theme.text 
+            }}>
+              🌙 Dark Mode
+            </h3>
+            <p style={{ 
+              fontSize: "14px", 
+              color: theme.textSecondary, 
+              margin: 0 
+            }}>
+              Switch between light and dark themes
+            </p>
+          </div>
+          <button
+            onClick={() => setIsDark(!isDark)}
+            style={{
+              width: "60px",
+              height: "32px",
+              borderRadius: "16px",
+              border: "none",
+              background: isDark ? "#34C759" : "#E5E7EB",
+              position: "relative",
+              cursor: "pointer",
+              transition: "all 0.3s ease"
+            }}
+          >
+            <div
+              style={{
+                width: "28px",
+                height: "28px",
+                borderRadius: "14px",
+                backgroundColor: "white",
+                position: "absolute",
+                top: "2px",
+                left: isDark ? "30px" : "2px",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                transition: "all 0.3s ease"
+              }}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Storage Info */}
+      <div 
+        style={{
+          background: isDark 
+            ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
+            : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
+          borderRadius: "16px",
+          padding: "20px",
+          marginBottom: "20px",
+          border: `1px solid ${theme.border}`,
+          boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.1)"
+        }}
+      >
+        <h3 style={{ 
+          fontSize: "18px", 
+          fontWeight: "600", 
+          marginBottom: "16px", 
+          color: theme.text,
+          display: "flex",
+          alignItems: "center",
+          gap: "8px"
+        }}>
+          💾 Storage Information
+        </h3>
+        <div style={{ fontSize: "15px", color: theme.textSecondary, lineHeight: "1.6" }}>
+          <div style={{ marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
+            <span>Tasks saved:</span>
+            <span style={{ fontWeight: "600", color: "#007AFF" }}>{taskList.length}</span>
+          </div>
+          <div style={{ marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
+            <span>Theme mode:</span>
+            <span style={{ fontWeight: "600", color: "#007AFF" }}>{isDark ? 'Dark' : 'Light'}</span>
+          </div>
+          <div style={{ marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
+            <span>Completed tasks:</span>
+            <span style={{ fontWeight: "600", color: "#34C759" }}>{taskList.filter(t => t.done).length}</span>
+          </div>
+          <div style={{ marginBottom: "12px", display: "flex", justifyContent: "space-between" }}>
+            <span>Last updated:</span>
+            <span style={{ fontWeight: "600", color: theme.text }}>{new Date().toLocaleTimeString()}</span>
+          </div>
+          <div style={{ 
+            fontSize: "13px", 
+            padding: "8px 12px", 
+            backgroundColor: isDark ? "#2C2C2E" : "#F0F0F0",
+            borderRadius: "8px",
+            textAlign: "center",
+            color: theme.textSecondary
+          }}>
+            📱 Data stored locally in your browser
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        {/* Export Data */}
+        <button 
+          onClick={() => {
+            const data = {
+              tasks: taskList,
+              theme: isDark,
+              exportDate: new Date().toISOString(),
+              totalTasks: taskList.length,
+              completedTasks: taskList.filter(t => t.done).length
+            };
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], {type:'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `todo-backup-${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+          }}
+          style={{
+            padding: "20px",
+            background: "linear-gradient(135deg, #34C759, #30D158)",
+            borderRadius: "16px",
+            border: "none",
+            textAlign: "left",
+            fontSize: "16px",
+            cursor: "pointer",
+            color: "white",
+            fontWeight: "600",
+            boxShadow: "0 4px 16px rgba(52, 199, 89, 0.3)",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            transition: "transform 0.2s ease"
+          }}
+          onMouseEnter={(e) => e.target.style.transform = "scale(1.02)"}
+          onMouseLeave={(e) => e.target.style.transform = "scale(1)"}
+        >
+          <span style={{ fontSize: "24px" }}>📤</span>
+          <div>
+            <div>Export Backup</div>
+            <div style={{ fontSize: "14px", opacity: 0.9, fontWeight: "400" }}>
+              Download your tasks as JSON file
+            </div>
+          </div>
+        </button>
+
+        {/* Clear All Data */}
+        <button 
+          onClick={() => {
+            const confirmed = window.confirm("⚠️ Clear all tasks and reset settings?\n\nThis action cannot be undone!");
+            if (confirmed) {
+              setTaskList([]);
+              setIsDark(false);
+            }
+          }}
+          style={{
+            padding: "20px",
+            background: "linear-gradient(135deg, #FF3B30, #FF6B6B)",
+            borderRadius: "16px",
+            border: "none",
+            textAlign: "left",
+            fontSize: "16px",
+            cursor: "pointer",
+            color: "white",
+            fontWeight: "600",
+            boxShadow: "0 4px 16px rgba(255, 59, 48, 0.3)",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            transition: "transform 0.2s ease"
+          }}
+          onMouseEnter={(e) => e.target.style.transform = "scale(1.02)"}
+          onMouseLeave={(e) => e.target.style.transform = "scale(1)"}
+        >
+          <span style={{ fontSize: "24px" }}>🗑️</span>
+          <div>
+            <div>Clear All Data</div>
+            <div style={{ fontSize: "14px", opacity: 0.9, fontWeight: "400" }}>
+              Remove all tasks and reset app
+            </div>
+          </div>
+        </button>
+        
+        {/* App Info */}
+        <div 
+          style={{
+            padding: "20px",
+            background: isDark 
+              ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
+              : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
+            borderRadius: "16px",
+            border: `1px solid ${theme.border}`,
+            textAlign: "center",
+            fontSize: "16px",
+            color: theme.text,
+            boxShadow: isDark ? "0 4px 16px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.1)"
+          }}
+        >
+          <div style={{ fontSize: "48px", marginBottom: "12px" }}>✨</div>
+          <div style={{ fontWeight: "700", marginBottom: "8px" }}>Todo App v2.0.0</div>
+          <div style={{ fontSize: "14px", color: theme.textSecondary, lineHeight: "1.5" }}>
+            Enhanced iOS-style design<br/>
+            Auto-save enabled • {taskList.length} tasks stored<br/>
+            <span style={{ fontSize: "12px", opacity: 0.8 }}>
+              Built with React & Framer Motion
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render tab content
   const renderTabContent = () => {
     switch(activeFooterTab) {
-      case 'stats':
-        return (
-          <div style={{ 
-            padding: "20px", 
-            backgroundColor: theme.background,
-            color: theme.text,
-            minHeight: "100vh"
-          }}>
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "center",
-              marginBottom: "20px"
-            }}>
-              <h2 style={{ fontSize: "24px", fontWeight: "700", margin: 0 }}>
-                📊 Statistics
-              </h2>
-              <button
-                onClick={() => setActiveFooterTab('today')}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "18px",
-                  color: theme.accent,
-                  cursor: "pointer"
-                }}
-              >
-                ← Back
-              </button>
-            </div>
-            
-            {/* Progress Bars */}
-            {Object.entries(categories).map(([category, config]) => {
-              const categoryTasks = getTasksByCategory(category);
-              const completed = categoryTasks.filter(t => t.done).length;
-              const total = categoryTasks.length;
-              const percentage = total > 0 ? (completed / total) * 100 : 0;
-              
-              return (
-                <div key={category} style={{ marginBottom: "16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                    <span style={{ fontSize: "16px", fontWeight: "500", color: theme.text }}>
-                      {config.icon} {category}
-                    </span>
-                    <span style={{ fontSize: "14px", color: theme.textSecondary }}>
-                      {completed}/{total}
-                    </span>
-                  </div>
-                  <div style={{
-                    width: "100%",
-                    height: "8px",
-                    backgroundColor: theme.border,
-                    borderRadius: "4px",
-                    overflow: "hidden"
-                  }}>
-                    <div style={{
-                      width: `${percentage}%`,
-                      height: "100%",
-                      backgroundColor: config.color,
-                      borderRadius: "4px",
-                      transition: "width 0.3s ease"
-                    }} />
-                  </div>
-                </div>
-              );
-            })}
-            
-            {/* Overall Stats */}
-            <div style={{
-              backgroundColor: theme.cardBackground,
-              borderRadius: "12px",
-              padding: "16px",
-              marginTop: "20px",
-              border: `1px solid ${theme.border}`
-            }}>
-              <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "12px", color: theme.text }}>
-                Overall Progress
-              </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "24px", fontWeight: "700", color: "#007AFF" }}>
-                    {taskList.length}
-                  </div>
-                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>Total</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "24px", fontWeight: "700", color: "#34C759" }}>
-                    {taskList.filter(t => t.done).length}
-                  </div>
-                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>Completed</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "24px", fontWeight: "700", color: "#FF9500" }}>
-                    {Math.round(taskList.length > 0 ? (taskList.filter(t => t.done).length / taskList.length) * 100 : 0)}%
-                  </div>
-                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>Success Rate</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-        
-      case 'calendar':
-        return (
-          <div style={{ 
-            padding: "20px", 
-            backgroundColor: theme.background,
-            color: theme.text,
-            minHeight: "100vh"
-          }}>
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "center",
-              marginBottom: "20px"
-            }}>
-              <h2 style={{ fontSize: "24px", fontWeight: "700", margin: 0 }}>
-                📆 Calendar View
-              </h2>
-              <button
-                onClick={() => setActiveFooterTab('today')}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "18px",
-                  color: theme.accent,
-                  cursor: "pointer"
-                }}
-              >
-                ← Back
-              </button>
-            </div>
-            
-            {/* Calendar Header */}
-            <div style={{
-              backgroundColor: theme.cardBackground,
-              borderRadius: "12px",
-              padding: "16px",
-              marginBottom: "20px",
-              border: `1px solid ${theme.border}`
-            }}>
-              <div style={{ textAlign: "center", marginBottom: "16px" }}>
-                <div style={{ fontSize: "18px", fontWeight: "600", color: theme.text }}>
-                  {currentTime.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                </div>
-                <div style={{ fontSize: "14px", color: theme.textSecondary, marginTop: "4px" }}>
-                  Today: {currentTime.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric' })}
-                </div>
-              </div>
-              
-              {/* Tasks by Date */}
-              <div>
-                <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "12px", color: theme.text }}>
-                  Recent Activity
-                </h3>
-                {taskList.length === 0 ? (
-                  <p style={{ color: theme.textSecondary, textAlign: "center", padding: "20px" }}>
-                    No tasks yet
-                  </p>
-                ) : (
-                  taskList.slice(0, 5).map(task => (
-                    <div key={task.id} style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "8px 0",
-                      borderBottom: `1px solid ${theme.border}`
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ 
-                          fontSize: "12px",
-                          padding: "2px 6px",
-                          borderRadius: "4px",
-                          backgroundColor: categories[task.category]?.color,
-                          color: "white"
-                        }}>
-                          {categories[task.category]?.icon}
-                        </span>
-                        <span style={{ fontSize: "14px", color: theme.text }}>{task.text}</span>
-                      </div>
-                      <span style={{ fontSize: "12px", color: theme.textSecondary }}>
-                        {new Date(task.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        );
-        
-      case 'settings':
-        return (
-          <div style={{ 
-            padding: "20px", 
-            backgroundColor: theme.background,
-            color: theme.text,
-            minHeight: "100vh"
-          }}>
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "center",
-              marginBottom: "20px"
-            }}>
-              <h2 style={{ fontSize: "24px", fontWeight: "700", margin: 0 }}>
-                ⚙️ Settings
-              </h2>
-              <button
-                onClick={() => setActiveFooterTab('today')}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "18px",
-                  color: theme.accent,
-                  cursor: "pointer"
-                }}
-              >
-                ← Back
-              </button>
-            </div>
-            
-            {/* Storage Info */}
-            <div style={{
-              backgroundColor: theme.cardBackground,
-              borderRadius: "12px",
-              padding: "16px",
-              marginBottom: "16px",
-              border: `1px solid ${theme.border}`
-            }}>
-              <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "8px", color: theme.text }}>
-                💾 Storage Info
-              </h3>
-              <div style={{ fontSize: "14px", color: theme.textSecondary }}>
-                <div>Tasks saved: {taskList.length}</div>
-                <div>Theme: {isDark ? 'Dark' : 'Light'} mode</div>
-                <div>Last updated: {new Date().toLocaleString()}</div>
-                <div style={{ fontSize: "12px", marginTop: "4px" }}>
-                  Data automatically saved to browser
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {/* Export Data */}
-              <button 
-                onClick={() => {
-                  const data = {
-                    tasks: taskList,
-                    theme: isDark,
-                    exportDate: new Date().toISOString()
-                  };
-                  const dataStr = JSON.stringify(data, null, 2);
-                  const dataBlob = new Blob([dataStr], {type:'application/json'});
-                  const url = URL.createObjectURL(dataBlob);
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = `todo-backup-${new Date().toISOString().split('T')[0]}.json`;
-                  link.click();
-                  URL.revokeObjectURL(url);
-                }}
-                style={{
-                  padding: "16px",
-                  backgroundColor: theme.cardBackground,
-                  borderRadius: "12px",
-                  border: `1px solid ${theme.border}`,
-                  textAlign: "left",
-                  fontSize: "16px",
-                  cursor: "pointer",
-                  color: "#34C759"
-                }}
-              >
-                📤 Export Backup
-              </button>
-
-              {/* Clear All Data */}
-              <button 
-                onClick={() => {
-                  const confirmed = window.confirm("Clear all tasks and reset settings? This cannot be undone!");
-                  if (confirmed) {
-                    setTaskList([]);
-                    localStorage.removeItem('todoTasks');
-                    localStorage.removeItem('todoTheme');
-                    setIsDark(false);
-                  }
-                }}
-                style={{
-                  padding: "16px",
-                  backgroundColor: theme.cardBackground,
-                  borderRadius: "12px",
-                  border: `1px solid ${theme.border}`,
-                  textAlign: "left",
-                  fontSize: "16px",
-                  cursor: "pointer",
-                  color: "#FF3B30"
-                }}
-              >
-                🗑️ Clear All Data
-              </button>
-              
-              <div style={{
-                padding: "16px",
-                backgroundColor: theme.cardBackground,
-                borderRadius: "12px",
-                border: `1px solid ${theme.border}`,
-                textAlign: "center",
-                fontSize: "14px",
-                color: theme.textSecondary
-              }}>
-                Todo App v1.0.0<br/>
-                <span style={{ fontSize: "12px" }}>
-                  Auto-save enabled • {taskList.length} tasks stored
-                </span>
-              </div>
-            </div>
-          </div>
-        );
-        
-      default:
-        return null;
+      case 'stats': return <StatsView />;
+      case 'calendar': return <CalendarView />;
+      case 'settings': return <SettingsView />;
+      default: return null;
     }
   };
 
@@ -465,8 +824,11 @@ function TodoiOSStyleComplete() {
   return (
     <div style={{
       minHeight: "100vh",
-      backgroundColor: theme.background,
-      fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif",
+      width: "100vw",
+      background: isDark 
+        ? "linear-gradient(135deg, #000000 0%, #1a1a1a 100%)"
+        : "linear-gradient(135deg, #F8F9FA 0%, #E3F2FD 100%)",
+      fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       padding: "0",
       position: "relative"
     }}>
@@ -498,25 +860,27 @@ function TodoiOSStyleComplete() {
               }} />
             ))}
           </div>
-          {/* <div style={{ fontSize: "14px" }}>📶 📶 🔋</div> */}
         </div>
       </div>
-<h2 style={{ 
-  marginLeft: "20px",
-  fontFamily: "'Nunito', -apple-system, BlinkMacSystemFont, sans-serif", // Fallback fonts
-  fontSize: "25px",        // Bigger for greeting
-  fontWeight: "700",       // Bold for hierarchy  
-  lineHeight: "2.5",       // Tight line spacing
-  marginBottom: "4px",     // Space to next element
-  marginTop: "0",          // Remove default margin
-  color: "#1a1a1a"         // Dark color (adjust for theme)
-}}>
-  Hi Ella
-</h2>
+
+      {/* Greeting */}
+      <h2 
+        style={{ 
+          marginLeft: "20px",
+          fontFamily: "'Nunito', -apple-system, BlinkMacSystemFont, sans-serif",
+          fontSize: "28px",
+          fontWeight: "700",
+          lineHeight: "1.2",
+          marginBottom: "8px",
+          marginTop: "16px",
+          color: isDark ? "#FFFFFF" : "#1a1a1a"
+        }}
+      >
+        Hi Ella 👋
+      </h2>
+
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
+      <div
         style={{
           padding: "20px 20px 0 20px",
           display: "flex",
@@ -538,114 +902,148 @@ function TodoiOSStyleComplete() {
         </div>
         
         {/* Dark Mode Toggle */}
-        <motion.button
-          whileTap={{ scale: 0.9 }}
+        <button
           onClick={() => setIsDark(!isDark)}
           style={{
-            padding: "8px 12px",
-            borderRadius: "12px",
-            border: `1px solid ${theme.border}`,
-            backgroundColor: theme.cardBackground,
+            padding: "12px 16px",
+            borderRadius: "16px",
+            border: "none",
+            background: isDark 
+              ? "linear-gradient(135deg, #2C2C2E 0%, #3A3A3C 100%)"
+              : "linear-gradient(135deg, #FFFFFF 0%, #F0F0F0 100%)",
             color: theme.text,
             fontSize: "20px",
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
-            gap: "4px",
-            boxShadow: isDark ? "0 2px 8px rgba(255,255,255,0.1)" : "0 2px 8px rgba(0,0,0,0.1)"
+            gap: "6px",
+            boxShadow: isDark ? "0 4px 16px rgba(255,255,255,0.1)" : "0 4px 16px rgba(0,0,0,0.1)",
+            transition: "all 0.3s ease"
           }}
         >
-          {isDark ? "☀️" : "🌙"}
-        </motion.button>
-      </motion.div>
+          <span>{isDark ? "☀️" : "🌙"}</span>
+          <span style={{ fontSize: "14px", fontWeight: "600" }}>
+            {isDark ? "Light" : "Dark"}
+          </span>
+        </button>
+      </div>
 
       {/* Category Stats */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+      <div
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
-          gap: "12px",
+          gap: "16px",
           padding: "24px 20px"
         }}
       >
-        {Object.entries(categories).map(([category, config]) => {
+        {Object.entries(categories).map(([category, config], index) => {
           const categoryTasks = getTasksByCategory(category);
           const count = categoryTasks.length;
+          const completed = categoryTasks.filter(t => t.done).length;
+          const percentage = count > 0 ? Math.round((completed / count) * 100) : 0;
           
           return (
-            <motion.div
+            <div
               key={category}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
               style={{
-                backgroundColor: isDark 
-                  ? `${config.color}20`
-                  : config.bgColor,
-                borderRadius: "16px",
-                padding: "16px",
-                minHeight: "80px",
+                background: isDark 
+                  ? `linear-gradient(135deg, ${config.color}30 0%, ${config.color}10 100%)`
+                  : `linear-gradient(135deg, ${config.bgColor} 0%, ${config.color}20 100%)`,
+                borderRadius: "20px",
+                padding: "20px",
+                minHeight: "100px",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
                 cursor: "pointer",
-                border: isDark ? `1px solid ${config.color}40` : "none",
+                border: isDark ? `1px solid ${config.color}40` : `1px solid ${config.color}30`,
                 boxShadow: isDark 
-                  ? "0 4px 16px rgba(0,0,0,0.3)" 
-                  : "0 2px 8px rgba(0,0,0,0.1)"
+                  ? `0 8px 32px ${config.color}20` 
+                  : `0 4px 20px ${config.color}30`,
+                position: "relative",
+                overflow: "hidden",
+                transition: "transform 0.2s ease"
               }}
+              onMouseEnter={(e) => e.target.style.transform = "scale(1.02) translateY(-2px)"}
+              onMouseLeave={(e) => e.target.style.transform = "scale(1) translateY(0px)"}
             >
               <div style={{
-                fontSize: "28px",
+                position: "absolute",
+                top: "10px",
+                right: "10px",
+                fontSize: "12px",
+                fontWeight: "700",
+                color: config.color,
+                background: isDark ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.8)",
+                padding: "4px 8px",
+                borderRadius: "8px"
+              }}>
+                {percentage}%
+              </div>
+              <div style={{
+                fontSize: "32px",
                 marginBottom: "8px"
               }}>
                 {config.icon}
               </div>
               <div>
                 <div style={{
-                  fontSize: "24px",
+                  fontSize: "28px",
                   fontWeight: "700",
                   color: theme.text,
-                  marginBottom: "2px"
+                  marginBottom: "4px"
                 }}>
                   {count}
                 </div>
                 <div style={{
                   fontSize: "15px",
-                  fontWeight: "400",
-                  color: theme.textSecondary
+                  fontWeight: "500",
+                  color: theme.textSecondary,
+                  marginBottom: "4px"
                 }}>
                   {category}
                 </div>
+                <div style={{
+                  fontSize: "12px",
+                  color: config.color,
+                  fontWeight: "600"
+                }}>
+                  {completed} completed
+                </div>
               </div>
-            </motion.div>
+            </div>
           );
         })}
-      </motion.div>
+      </div>
 
       {/* Task List */}
       <div style={{ padding: "0 20px" }}>
         <AnimatePresence>
           {taskList.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+            <div
               style={{
                 textAlign: "center",
-                padding: "40px 20px",
-                color: theme.textSecondary
+                padding: "60px 20px",
+                color: theme.textSecondary,
+                background: isDark 
+                  ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
+                  : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
+                borderRadius: "24px",
+                border: `1px solid ${theme.border}`,
+                boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.1)"
               }}
             >
-              <div style={{ fontSize: "48px", marginBottom: "16px" }}>📝</div>
-              <p style={{ fontSize: "17px", margin: "0" }}>No tasks yet</p>
-              <p style={{ fontSize: "15px", margin: "8px 0 0 0" }}>Tap + to add your first task</p>
-            </motion.div>
+              <div style={{ fontSize: "64px", marginBottom: "20px" }}>📝</div>
+              <p style={{ fontSize: "20px", margin: "0", fontWeight: "600" }}>No tasks yet</p>
+              <p style={{ fontSize: "16px", margin: "12px 0 0 0", opacity: 0.7 }}>
+                Tap the + button to add your first task
+              </p>
+            </div>
           ) : (
             taskList
               .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-              .map((task) => (
+              .map((task, index) => (
                 <motion.div
                   key={task.id}
                   variants={taskVariants}
@@ -654,16 +1052,30 @@ function TodoiOSStyleComplete() {
                   exit="exit"
                   layout
                   style={{
-                    backgroundColor: theme.cardBackground,
-                    borderRadius: "12px",
-                    marginBottom: "8px",
-                    padding: "16px",
+                    background: isDark 
+                      ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
+                      : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
+                    borderRadius: "16px",
+                    marginBottom: "12px",
+                    padding: "20px",
                     boxShadow: isDark 
-                      ? "0 2px 8px rgba(0,0,0,0.3)" 
-                      : "0 1px 3px rgba(0,0,0,0.1)",
-                    border: `1px solid ${theme.border}`
+                      ? "0 4px 20px rgba(0,0,0,0.4)" 
+                      : "0 2px 12px rgba(0,0,0,0.1)",
+                    border: `1px solid ${theme.border}`,
+                    position: "relative",
+                    overflow: "hidden"
                   }}
                 >
+                  {/* Category color strip */}
+                  <div style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: "4px",
+                    background: `linear-gradient(to bottom, ${categories[task.category]?.color}, ${categories[task.category]?.color}80)`
+                  }} />
+
                   {editTask?.id === task.id ? (
                     /* Edit Mode */
                     <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
@@ -677,28 +1089,30 @@ function TodoiOSStyleComplete() {
                         }}
                         style={{
                           flex: 1,
-                          padding: "12px",
-                          borderRadius: "8px",
+                          padding: "16px",
+                          borderRadius: "12px",
                           border: "2px solid #007AFF",
                           background: theme.background,
                           color: theme.text,
                           fontSize: "16px",
                           outline: "none",
-                          fontFamily: "inherit"
+                          fontFamily: "inherit",
+                          boxShadow: "0 0 0 4px rgba(0, 122, 255, 0.1)"
                         }}
                         autoFocus
                       />
                       <button
                         onClick={handleUpdate}
                         style={{
-                          padding: "8px 12px",
-                          borderRadius: "6px",
+                          padding: "12px 16px",
+                          borderRadius: "10px",
                           border: "none",
-                          background: "#34C759",
+                          background: "linear-gradient(135deg, #34C759, #30D158)",
                           color: "white",
                           fontSize: "14px",
                           fontWeight: "600",
-                          cursor: "pointer"
+                          cursor: "pointer",
+                          boxShadow: "0 2px 8px rgba(52, 199, 89, 0.3)"
                         }}
                       >
                         Save
@@ -706,14 +1120,15 @@ function TodoiOSStyleComplete() {
                       <button
                         onClick={() => setEditTask(null)}
                         style={{
-                          padding: "8px 12px",
-                          borderRadius: "6px",
+                          padding: "12px 16px",
+                          borderRadius: "10px",
                           border: "none",
-                          background: "#FF3B30",
+                          background: "linear-gradient(135deg, #FF3B30, #FF6B6B)",
                           color: "white",
                           fontSize: "14px",
                           fontWeight: "600",
-                          cursor: "pointer"
+                          cursor: "pointer",
+                          boxShadow: "0 2px 8px rgba(255, 59, 48, 0.3)"
                         }}
                       >
                         Cancel
@@ -721,68 +1136,81 @@ function TodoiOSStyleComplete() {
                     </div>
                   ) : (
                     /* Display Mode */
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-                      <motion.button
-                        whileTap={{ scale: 0.9 }}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
+                      <button
                         onClick={() => toggleDone(task)}
                         style={{
-                          width: "24px",
-                          height: "24px",
-                          borderRadius: "6px",
-                          border: task.done ? "none" : `2px solid ${theme.border}`,
-                          background: task.done ? "#34C759" : "transparent",
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "8px",
+                          border: task.done ? "none" : `2px solid ${categories[task.category]?.color || theme.border}`,
+                          background: task.done 
+                            ? `linear-gradient(135deg, #34C759, #30D158)`
+                            : "transparent",
                           color: "white",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           cursor: "pointer",
-                          fontSize: "12px",
-                          marginTop: "1px",
-                          flexShrink: 0
+                          fontSize: "14px",
+                          marginTop: "2px",
+                          flexShrink: 0,
+                          transition: "all 0.3s ease",
+                          boxShadow: task.done ? "0 2px 8px rgba(52, 199, 89, 0.3)" : "none"
                         }}
                       >
                         {task.done && "✓"}
-                      </motion.button>
+                      </button>
                       
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
-                          fontSize: "17px",
-                          fontWeight: "400",
+                          fontSize: "18px",
+                          fontWeight: "500",
                           lineHeight: "1.4",
                           textDecoration: task.done ? "line-through" : "none",
-                          opacity: task.done ? 0.5 : 1,
+                          opacity: task.done ? 0.6 : 1,
                           color: theme.text,
-                          marginBottom: "6px"
+                          marginBottom: "8px"
                         }}>
                           {task.text}
                         </div>
                         
-                        <div style={{
-                          display: "inline-block",
-                          padding: "2px 8px",
-                          borderRadius: "6px",
-                          backgroundColor: categories[task.category]?.color || "#6B7280",
-                          color: "white",
-                          fontSize: "11px",
-                          fontWeight: "600",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px"
-                        }}>
-                          {task.category}
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <div style={{
+                            display: "inline-block",
+                            padding: "4px 10px",
+                            borderRadius: "8px",
+                            background: `linear-gradient(135deg, ${categories[task.category]?.color}, ${categories[task.category]?.color}CC)`,
+                            color: "white",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px"
+                          }}>
+                            {categories[task.category]?.icon} {task.category}
+                          </div>
+                          <div style={{
+                            fontSize: "12px",
+                            color: theme.textSecondary,
+                            fontWeight: "500"
+                          }}>
+                            {new Date(task.createdAt).toLocaleDateString()}
+                          </div>
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", gap: "8px", marginTop: "2px" }}>
+                      <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
                         <button
                           onClick={() => handleEdit(task)}
                           style={{
-                            background: "none",
+                            background: "linear-gradient(135deg, #007AFF, #0051D2)",
                             border: "none",
-                            fontSize: "16px",
+                            fontSize: "14px",
                             cursor: "pointer",
-                            padding: "4px",
-                            borderRadius: "4px",
-                            color: "#007AFF"
+                            padding: "8px",
+                            borderRadius: "8px",
+                            color: "white",
+                            boxShadow: "0 2px 8px rgba(0, 122, 255, 0.3)"
                           }}
                         >
                           ✏️
@@ -790,13 +1218,14 @@ function TodoiOSStyleComplete() {
                         <button
                           onClick={() => handleDelete(task)}
                           style={{
-                            background: "none",
+                            background: "linear-gradient(135deg, #FF3B30, #FF6B6B)",
                             border: "none",
-                            fontSize: "16px",
+                            fontSize: "14px",
                             cursor: "pointer",
-                            padding: "4px",
-                            borderRadius: "4px",
-                            color: "#FF3B30"
+                            padding: "8px",
+                            borderRadius: "8px",
+                            color: "white",
+                            boxShadow: "0 2px 8px rgba(255, 59, 48, 0.3)"
                           }}
                         >
                           🗑️
@@ -823,42 +1252,50 @@ function TodoiOSStyleComplete() {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: "rgba(0,0,0,0.5)",
+              backgroundColor: "rgba(0,0,0,0.6)",
               display: "flex",
               alignItems: "flex-end",
-              zIndex: 1000
+              zIndex: 1000,
+              backdropFilter: "blur(10px)"
             }}
             onClick={() => setShowAddTask(false)}
           >
             <motion.div
-              initial={{ y: 300 }}
+              initial={{ y: 400 }}
               animate={{ y: 0 }}
-              exit={{ y: 300 }}
+              exit={{ y: 400 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
               onClick={(e) => e.stopPropagation()}
               style={{
-                backgroundColor: theme.cardBackground,
-                borderTopLeftRadius: "24px",
-                borderTopRightRadius: "24px",
-                padding: "24px 20px 40px 20px",
+                background: isDark 
+                  ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
+                  : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
+                borderTopLeftRadius: "28px",
+                borderTopRightRadius: "28px",
+                padding: "28px 24px 40px 24px",
                 width: "100%",
-                maxHeight: "70vh"
+                maxHeight: "75vh",
+                boxShadow: isDark ? "0 -8px 32px rgba(0,0,0,0.4)" : "0 -4px 20px rgba(0,0,0,0.1)"
               }}
             >
-              <div style={{
-                width: "36px",
-                height: "4px",
-                backgroundColor: theme.border,
-                borderRadius: "2px",
-                margin: "0 auto 24px auto"
-              }} />
+              <div 
+                style={{
+                  width: "40px",
+                  height: "4px",
+                  background: theme.border,
+                  borderRadius: "2px",
+                  margin: "0 auto 28px auto"
+                }} 
+              />
 
               <h2 style={{
-                fontSize: "24px",
+                fontSize: "28px",
                 fontWeight: "700",
-                margin: "0 0 20px 0",
-                color: theme.text
+                margin: "0 0 24px 0",
+                color: theme.text,
+                textAlign: "center"
               }}>
-                Add New Task
+                 Add New Task
               </h2>
 
               <input
@@ -866,79 +1303,87 @@ function TodoiOSStyleComplete() {
                 value={task}
                 onChange={(e) => setTask(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                placeholder="Enter task description..."
+                placeholder="What needs to be done?"
                 style={{
                   width: "100%",
-                  padding: "16px",
-                  borderRadius: "12px",
-                  border: `1px solid ${theme.border}`,
-                  backgroundColor: theme.background,
+                  padding: "20px",
+                  borderRadius: "16px",
+                  border: `2px solid ${theme.border}`,
+                  background: isDark ? "#2C2C2E" : "#F8F9FA",
                   color: theme.text,
-                  fontSize: "17px",
+                  fontSize: "18px",
                   outline: "none",
-                  marginBottom: "20px",
+                  marginBottom: "24px",
                   fontFamily: "inherit",
-                  boxSizing: "border-box"
+                  boxSizing: "border-box",
+                  transition: "all 0.3s ease"
                 }}
                 autoFocus
               />
 
-              <div style={{ marginBottom: "24px" }}>
-                <div style={{
-                  fontSize: "17px",
-                  fontWeight: "600",
-                  marginBottom: "12px",
-                  color: theme.text
-                }}>
-                  Category
+              <div style={{ marginBottom: "28px" }}>
+                <div 
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: "600",
+                    marginBottom: "16px",
+                    color: theme.text
+                  }}
+                >
+                  🏷️ Choose Category
                 </div>
                 <div style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
-                  gap: "8px"
+                  gap: "12px"
                 }}>
                   {Object.entries(categories).map(([category, config]) => (
                     <button
                       key={category}
                       onClick={() => setSelectedCategory(category)}
                       style={{
-                        padding: "12px",
-                        borderRadius: "12px",
+                        padding: "16px",
+                        borderRadius: "16px",
                         border: selectedCategory === category 
                           ? `2px solid ${config.color}` 
                           : `1px solid ${theme.border}`,
                         background: selectedCategory === category 
                           ? (isDark ? `${config.color}20` : config.bgColor)
-                          : theme.cardBackground,
+                          : (isDark ? "#2C2C2E" : "#FFFFFF"),
                         color: theme.text,
-                        fontSize: "15px",
-                        fontWeight: selectedCategory === category ? "600" : "400",
+                        fontSize: "16px",
+                        fontWeight: selectedCategory === category ? "600" : "500",
                         cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
-                        gap: "8px"
+                        gap: "10px",
+                        transition: "all 0.3s ease",
+                        boxShadow: selectedCategory === category 
+                          ? `0 4px 16px ${config.color}30`
+                          : "none"
                       }}
                     >
-                      <span style={{ fontSize: "18px" }}>{config.icon}</span>
+                      <span style={{ fontSize: "20px" }}>{config.icon}</span>
                       {category}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "12px" }}>
+              <div style={{ display: "flex", gap: "16px" }}>
                 <button
                   onClick={() => setShowAddTask(false)}
                   style={{
                     flex: 1,
-                    padding: "16px",
-                    borderRadius: "12px",
+                    padding: "18px",
+                    borderRadius: "16px",
                     border: `1px solid ${theme.border}`,
-                    background: theme.cardBackground,
+                    background: isDark ? "#2C2C2E" : "#F8F9FA",
                     color: theme.text,
-                    fontSize: "17px",
+                    fontSize: "18px",
                     fontWeight: "600",
-                    cursor: "pointer"
+                    cursor: "pointer",
+                    transition: "all 0.3s ease"
                   }}
                 >
                   Cancel
@@ -948,14 +1393,18 @@ function TodoiOSStyleComplete() {
                   disabled={!task.trim()}
                   style={{
                     flex: 1,
-                    padding: "16px",
-                    borderRadius: "12px",
+                    padding: "18px",
+                    borderRadius: "16px",
                     border: "none",
-                    background: task.trim() ? "#007AFF" : "#C7C7CC",
+                    background: task.trim() 
+                      ? "linear-gradient(135deg, #007AFF, #0051D2)"
+                      : "#C7C7CC",
                     color: "white",
-                    fontSize: "17px",
+                    fontSize: "18px",
                     fontWeight: "600",
-                    cursor: task.trim() ? "pointer" : "not-allowed"
+                    cursor: task.trim() ? "pointer" : "not-allowed",
+                    transition: "all 0.3s ease",
+                    boxShadow: task.trim() ? "0 4px 16px rgba(0, 122, 255, 0.3)" : "none"
                   }}
                 >
                   Add Task
@@ -967,48 +1416,47 @@ function TodoiOSStyleComplete() {
       </AnimatePresence>
 
       {/* Floating Add Button */}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+      <button
         onClick={() => setShowAddTask(true)}
         style={{
           position: "fixed",
-          bottom: "120px",
-          right: "20px",
-          width: "56px",
-          height: "56px",
-          borderRadius: "28px",
+          bottom: "130px",
+          right: "24px",
+          width: "64px",
+          height: "64px",
+          borderRadius: "32px",
           border: "none",
-          background: "#007AFF",
+          background: "linear-gradient(135deg, #007AFF, #0051D2)",
           color: "white",
-          fontSize: "24px",
+          fontSize: "28px",
+          fontWeight: "300",
           cursor: "pointer",
-          boxShadow: "0 4px 16px rgba(0,122,255,0.3)",
+          boxShadow: "0 8px 32px rgba(0, 122, 255, 0.4)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          zIndex: 100
+          zIndex: 100,
+          transition: "all 0.3s ease"
         }}
+        onMouseEnter={(e) => e.target.style.transform = "scale(1.1)"}
+        onMouseLeave={(e) => e.target.style.transform = "scale(1)"}
       >
         +
-      </motion.button>
+      </button>
 
       {/* Footer Navigation */}
-      <motion.div
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.5 }}
+      <div
         style={{
           position: "fixed",
           bottom: 0,
           left: 0,
           right: 0,
-          backgroundColor: isDark 
+          background: isDark 
             ? "rgba(28, 28, 30, 0.95)" 
             : "rgba(255, 255, 255, 0.95)",
           backdropFilter: "blur(20px)",
           borderTop: `1px solid ${theme.border}`,
-          padding: "8px 0 24px 0",
+          padding: "12px 0 28px 0",
           zIndex: 50
         }}
       >
@@ -1017,20 +1465,36 @@ function TodoiOSStyleComplete() {
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          padding: "8px 20px",
-          fontSize: "13px",
+          padding: "12px 24px",
+          fontSize: "14px",
           color: theme.textSecondary,
           borderBottom: `1px solid ${theme.border}`,
-          marginBottom: "8px"
+          marginBottom: "12px",
+          gap: "20px"
         }}>
-          <span style={{ marginRight: "16px" }}>
-            📊 {taskList.length} total
+          <span style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "4px",
+            fontWeight: "600"
+          }}>
+            📊 <span style={{ color: "#007AFF" }}>{taskList.length}</span> total
           </span>
-          <span style={{ marginRight: "16px" }}>
-            ✅ {taskList.filter(t => t.done).length} done
+          <span style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "4px",
+            fontWeight: "600"
+          }}>
+            ✅ <span style={{ color: "#34C759" }}>{taskList.filter(t => t.done).length}</span> done
           </span>
-          <span>
-            ⏳ {taskList.filter(t => !t.done).length} pending
+          <span style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "4px",
+            fontWeight: "600"
+          }}>
+            ⏳ <span style={{ color: "#FF9500" }}>{taskList.filter(t => !t.done).length}</span> pending
           </span>
         </div>
 
@@ -1039,7 +1503,7 @@ function TodoiOSStyleComplete() {
           display: "flex",
           justifyContent: "space-around",
           alignItems: "center",
-          padding: "0 20px"
+          padding: "0 24px"
         }}>
           {[
             { id: 'today', icon: '📅', label: 'Today' },
@@ -1048,9 +1512,8 @@ function TodoiOSStyleComplete() {
             { id: 'calendar', icon: '📆', label: 'Calendar' },
             { id: 'settings', icon: '⚙️', label: 'Settings' }
           ].map((tab) => (
-            <motion.button
+            <button
               key={tab.id}
-              whileTap={{ scale: 0.9 }}
               onClick={() => {
                 if (tab.id === 'add') {
                   setShowAddTask(true);
@@ -1062,14 +1525,14 @@ function TodoiOSStyleComplete() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: "4px",
-                padding: tab.isSpecial ? "8px" : "4px 8px",
-                borderRadius: tab.isSpecial ? "20px" : "8px",
+                gap: "6px",
+                padding: tab.isSpecial ? "12px" : "8px 12px",
+                borderRadius: tab.isSpecial ? "24px" : "12px",
                 border: "none",
                 background: tab.isSpecial 
-                  ? "#007AFF" 
+                  ? "linear-gradient(135deg, #007AFF, #0051D2)" 
                   : (activeFooterTab === tab.id 
-                      ? (isDark ? "#2C2C2E" : "#E3F2FD") 
+                      ? (isDark ? "linear-gradient(135deg, #2C2C2E, #3A3A3C)" : "linear-gradient(135deg, #E3F2FD, #BBDEFB)") 
                       : "transparent"),
                 color: tab.isSpecial 
                   ? "white" 
@@ -1077,31 +1540,39 @@ function TodoiOSStyleComplete() {
                       ? "#007AFF" 
                       : theme.textSecondary),
                 cursor: "pointer",
-                minWidth: tab.isSpecial ? "40px" : "auto",
-                transition: "all 0.2s ease"
+                minWidth: tab.isSpecial ? "48px" : "auto",
+                transition: "all 0.3s ease",
+                boxShadow: tab.isSpecial 
+                  ? "0 4px 16px rgba(0, 122, 255, 0.3)"
+                  : (activeFooterTab === tab.id ? "0 2px 8px rgba(0, 122, 255, 0.2)" : "none")
               }}
             >
               <span style={{ 
-                fontSize: tab.isSpecial ? "20px" : "16px",
-                fontWeight: tab.isSpecial ? "600" : "400"
+                fontSize: tab.isSpecial ? "24px" : "18px",
+                fontWeight: tab.isSpecial ? "300" : "400"
               }}>
                 {tab.icon}
               </span>
               {!tab.isSpecial && (
                 <span style={{ 
-                  fontSize: "11px", 
-                  fontWeight: activeFooterTab === tab.id ? "600" : "400"
+                  fontSize: "12px", 
+                  fontWeight: activeFooterTab === tab.id ? "600" : "500"
                 }}>
                   {tab.label}
                 </span>
               )}
-            </motion.button>
+            </button>
           ))}
         </div>
-      </motion.div>
+      </div>
 
       {/* Bottom Padding */}
-      <div style={{ height: "120px" }} />
+      <div style={{ height: "140px" }} />
+
+      {/* Confetti Animation */}
+      <AnimatePresence>
+        {showConfetti && <ConfettiEffect />}
+      </AnimatePresence>
     </div>
   );
 }
