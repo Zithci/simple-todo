@@ -1,20 +1,46 @@
+// App.jsx - Main Component
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+// Import Components
+import Stats from './components/stats';
+import Calendar from './components/calendar';
+import Settings from './components/settings';
+import Confetti from './components/confetti';
+import AddTaskModal from './components/addTaskModal';
+import Timer from './components/Timer';
 
 function TodoiOSStyleComplete() {
   const [task, setTask] = useState("");
   const [editTask, setEditTask] = useState(null);
   const [editText, setEditText] = useState("");
+  const [showTimer, setShowTimer] = useState(false);
+  const [activeTask, setActiveTask] = useState(null);
   
-  const [taskList, setTaskList] = useState([]);
+  const [taskList, setTaskList] = useState(() => {
+    const savedTasks = localStorage.getItem('todoTasks');
+    if (savedTasks) {
+      try {
+        return JSON.parse(savedTasks);
+      } catch (error) {
+        console.error('Error loading tasks:', error);
+        return [];
+      }
+    }
+    return [];
+  });
   
   const [selectedCategory, setSelectedCategory] = useState("Health");
   const [showAddTask, setShowAddTask] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activeFooterTab, setActiveFooterTab] = useState('today');
   const [showConfetti, setShowConfetti] = useState(false);
+  const [swipedTask, setSwipedTask] = useState(null);
   
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    const savedTheme = localStorage.getItem('todoTheme');
+    return savedTheme ? JSON.parse(savedTheme) : false;
+  });
 
   // Categories with colors and icons
   const categories = {
@@ -64,7 +90,7 @@ function TodoiOSStyleComplete() {
     // Show confetti when task is completed
     if (!taskObj.done) {
       setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 3000);
+      setTimeout(() => setShowConfetti(false), 5000);
     }
   };
 
@@ -85,22 +111,6 @@ function TodoiOSStyleComplete() {
     setEditText("");
   };
 
-  // Fix body background for full dark theme
-useEffect(() => {
-  if (isDark) {
-    document.body.style.backgroundColor = '#000000';
-    document.documentElement.style.backgroundColor = '#000000';
-  } else {
-    document.body.style.backgroundColor = '#F8F9FA';
-    document.documentElement.style.backgroundColor = '#F8F9FA';
-  }
-  
-  return () => {
-    document.body.style.backgroundColor = '';
-    document.documentElement.style.backgroundColor = '';
-  };
-}, [isDark]);
-
   // Real-time clock
   useEffect(() => {
     const timer = setInterval(() => {
@@ -109,12 +119,36 @@ useEffect(() => {
     return () => clearInterval(timer);
   }, []);
 
-  // Get tasks by category
+  // Fix body background for full dark theme
+  useEffect(() => {
+    if (isDark) {
+      document.body.style.backgroundColor = '#000000';
+      document.documentElement.style.backgroundColor = '#000000';
+    } else {
+      document.body.style.backgroundColor = '#F8F9FA';
+      document.documentElement.style.backgroundColor = '#F8F9FA';
+    }
+    
+    return () => {
+      document.body.style.backgroundColor = '';
+      document.documentElement.style.backgroundColor = '';
+    };
+  }, [isDark]);
+
+  // Save tasks to localStorage
+  useEffect(() => {
+    localStorage.setItem('todoTasks', JSON.stringify(taskList));
+  }, [taskList]);
+
+  // Save theme to localStorage
+  useEffect(() => {
+    localStorage.setItem('todoTheme', JSON.stringify(isDark));
+  }, [isDark]);
+
   const getTasksByCategory = (category) => {
     return taskList.filter(task => task.category === category);
   };
 
-  // Get current date
   const getCurrentDate = () => {
     return currentTime.toLocaleDateString('en-US', { 
       weekday: 'long',
@@ -129,689 +163,42 @@ useEffect(() => {
     exit: { opacity: 0, x: 20 }
   };
 
-  // Confetti Component
-  const ConfettiEffect = () => {
-    const confettiPieces = Array.from({ length: 150 }, (_, i) => ({
-      id: i,
-      left: Math.random() * 100,
-      delay: Math.random() * 3,
-      duration: 2 + Math.random() * 2,
-      color: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'][Math.floor(Math.random() * 7)],
-      shape: Math.random() > 0.6 ? 'star' : Math.random() > 0.4 ? 'circle' : Math.random() > 0.2 ? 'square' : 'heart',
-      size : 10 + Math.random() * 12
-    }));
-
-    return (
-      <div style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100%",
-        height: "100%",
-        pointerEvents: "none",
-        zIndex: 9999,
-        overflow: "hidden"
-      }}>
-        {confettiPieces.map(piece => (
-          <motion.div
-            key={piece.id}
-            initial={{ 
-              y: -10, 
-              x: `${piece.left}vw`, 
-              rotate: 0,
-              scale: 0
-            }}
-            animate={{ 
-              y: "100vh", 
-              rotate: 360,
-              scale: [0, 1, 1, 0]
-            }}
-            transition={{
-              duration: piece.duration,
-              delay: piece.delay,
-              ease: "easeOut"
-            }}
-            style={{
-              position: "absolute",
-              width: "10px",
-              height: "10px",
-              backgroundColor: piece.color,
-              borderRadius: Math.random() > 0.5 ? "50%" : "2px"
-            }}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  // Stats Component
-  const StatsView = () => (
-    <div style={{ 
-      padding: "20px", 
-      backgroundColor: theme.background,
-      color: theme.text,
-      minHeight: "100vh"
-    }}>
-      <div style={{ 
-        display: "flex", 
-        justifyContent: "space-between", 
-        alignItems: "center",
-        marginBottom: "30px"
-      }}>
-        <h2 style={{ 
-          fontSize: "32px", 
-          fontWeight: "700", 
-          margin: 0,
-          color: theme.text
-        }}>
-          📊 Statistics
-        </h2>
-        <button
-          onClick={() => setActiveFooterTab('today')}
-          style={{
-            background: "linear-gradient(135deg, #007AFF, #0051D2)",
-            border: "none",
-            fontSize: "16px",
-            color: "white",
-            cursor: "pointer",
-            padding: "10px 16px",
-            borderRadius: "12px",
-            fontWeight: "600"
-          }}
-        >
-          ← Back
-        </button>
-      </div>
-      
-      {/* Progress Bars */}
-      {Object.entries(categories).map(([category, config]) => {
-        const categoryTasks = getTasksByCategory(category);
-        const completed = categoryTasks.filter(t => t.done).length;
-        const total = categoryTasks.length;
-        const percentage = total > 0 ? (completed / total) * 100 : 0;
-        
-        return (
-          <div 
-            key={category} 
-            style={{ 
-              marginBottom: "20px",
-              padding: "16px",
-              backgroundColor: theme.cardBackground,
-              borderRadius: "16px",
-              border: `1px solid ${theme.border}`,
-              boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.3)" : "0 2px 12px rgba(0,0,0,0.1)"
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-              <span style={{ 
-                fontSize: "18px", 
-                fontWeight: "600", 
-                color: theme.text,
-                display: "flex",
-                alignItems: "center",
-                gap: "8px"
-              }}>
-                <span style={{ fontSize: "24px" }}>{config.icon}</span>
-                {category}
-              </span>
-              <span style={{ 
-                fontSize: "16px", 
-                color: theme.textSecondary,
-                fontWeight: "600"
-              }}>
-                {completed}/{total}
-              </span>
-            </div>
-            <div style={{
-              width: "100%",
-              height: "12px",
-              backgroundColor: isDark ? "#2C2C2E" : "#F0F0F0",
-              borderRadius: "6px",
-              overflow: "hidden",
-              position: "relative"
-            }}>
-              <div 
-                style={{
-                  width: `${percentage}%`,
-                  height: "100%",   
-                  background: `linear-gradient(90deg, ${config.color}, ${config.color}CC)`,
-                  borderRadius: "6px",
-                  position: "relative",
-                  transition: "width 0.5s ease"
-                }}
-              />
-              <span style={{
-                position: "absolute",
-                right: "8px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                fontSize: "10px",
-                fontWeight: "700",
-                color: percentage > 50 ? "white" : theme.text
-              }}>
-                {Math.round(percentage)}%
-              </span>
-            </div>
-          </div>
-        );
-      })}
-      
-      {/* Overall Stats */}
-      <div 
-        style={{
-          background: isDark 
-            ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
-            : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
-          borderRadius: "20px",
-          padding: "24px",
-          marginTop: "30px",
-          border: `1px solid ${theme.border}`,
-          boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.1)"
-        }}
-      >
-        <h3 style={{ 
-          fontSize: "24px", 
-          fontWeight: "700", 
-          marginBottom: "20px", 
-          color: theme.text,
-          textAlign: "center"
-        }}>
-          🏆 Overall Progress
-        </h3>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
-          <div style={{ textAlign: "center" }}>
-            <div 
-              style={{ 
-                fontSize: "36px", 
-                fontWeight: "700", 
-                color: "#007AFF",
-                marginBottom: "8px"
-              }}
-            >
-              {taskList.length}
-            </div>
-            <div style={{ fontSize: "14px", color: theme.textSecondary, fontWeight: "500" }}>Total Tasks</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <div 
-              style={{ 
-                fontSize: "36px", 
-                fontWeight: "700", 
-                color: "#34C759",
-                marginBottom: "8px"
-              }}
-            >
-              {taskList.filter(t => t.done).length}
-            </div>
-            <div style={{ fontSize: "14px", color: theme.textSecondary, fontWeight: "500" }}>Completed</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <div 
-              style={{ 
-                fontSize: "36px", 
-                fontWeight: "700", 
-                color: "#FF9500",
-                marginBottom: "8px"
-              }}
-            >
-              {Math.round(taskList.length > 0 ? (taskList.filter(t => t.done).length / taskList.length) * 100 : 0)}%
-            </div>
-            <div style={{ fontSize: "14px", color: theme.textSecondary, fontWeight: "500" }}>Success Rate</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Calendar View
-  const CalendarView = () => (
-    <div style={{ 
-      padding: "20px", 
-      backgroundColor: theme.background,
-      color: theme.text,
-      minHeight: "100vh"
-    }}>
-      <div style={{ 
-        display: "flex", 
-        justifyContent: "space-between", 
-        alignItems: "center",
-        marginBottom: "30px"
-      }}>
-        <h2 style={{ 
-          fontSize: "32px", 
-          fontWeight: "700", 
-          margin: 0,
-          color: theme.text
-        }}>
-          📆 Calendar
-        </h2>
-        <button
-          onClick={() => setActiveFooterTab('today')}
-          style={{
-            background: "linear-gradient(135deg, #007AFF, #0051D2)",
-            border: "none",
-            fontSize: "16px",
-            color: "white",
-            cursor: "pointer",
-            padding: "10px 16px",
-            borderRadius: "12px",
-            fontWeight: "600"
-          }}
-        >
-          ← Back
-        </button>
-      </div>
-      
-      {/* Calendar Header */}
-      <div 
-        style={{
-          background: isDark 
-            ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
-            : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
-          borderRadius: "20px",
-          padding: "24px",
-          marginBottom: "25px",
-          border: `1px solid ${theme.border}`,
-          boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.1)"
-        }}
-      >
-        <div style={{ textAlign: "center", marginBottom: "20px" }}>
-          <div style={{ 
-            fontSize: "28px", 
-            fontWeight: "700", 
-            color: theme.text,
-            marginBottom: "8px"
-          }}>
-            {currentTime.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </div>
-          <div style={{ 
-            fontSize: "16px", 
-            color: theme.textSecondary,
-            fontWeight: "500"
-          }}>
-            Today: {currentTime.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric' })}
-          </div>
-          <div style={{
-            fontSize: "24px",
-            fontWeight: "700",
-            color: "#007AFF",
-            marginTop: "8px"
-          }}>
-            {currentTime.toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            })}
-          </div>
-        </div>
-        
-        {/* Task Timeline */}
-        <div>
-          <h3 style={{ 
-            fontSize: "20px", 
-            fontWeight: "700", 
-            marginBottom: "16px", 
-            color: theme.text,
-            display: "flex",
-            alignItems: "center",
-            gap: "8px"
-          }}>
-            ⏰ Recent Activity
-          </h3>
-          {taskList.length === 0 ? (
-            <div style={{ 
-              textAlign: "center", 
-              padding: "40px 20px",
-              color: theme.textSecondary 
-            }}>
-              <div style={{ fontSize: "48px", marginBottom: "16px" }}>📅</div>
-              <p style={{ fontSize: "18px", margin: "0", fontWeight: "500" }}>No tasks yet</p>
-              <p style={{ fontSize: "14px", margin: "8px 0 0 0" }}>Start creating tasks to see your activity</p>
-            </div>
-          ) : (
-            taskList.slice(0, 8).map((task, index) => (
-              <div 
-                key={task.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "12px 0",
-                  borderBottom: index < Math.min(taskList.length, 8) - 1 ? `1px solid ${theme.border}` : "none"
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1 }}>
-                  <span style={{ 
-                    fontSize: "16px",
-                    padding: "6px 10px",
-                    borderRadius: "8px",
-                    backgroundColor: categories[task.category]?.color,
-                    color: "white",
-                    fontWeight: "600",
-                    minWidth: "32px",
-                    textAlign: "center"
-                  }}>
-                    {categories[task.category]?.icon}
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ 
-                      fontSize: "16px", 
-                      color: theme.text,
-                      fontWeight: "500",
-                      textDecoration: task.done ? "line-through" : "none",
-                      opacity: task.done ? 0.6 : 1
-                    }}>
-                      {task.text}
-                    </div>
-                    <div style={{ 
-                      fontSize: "12px", 
-                      color: theme.textSecondary,
-                      marginTop: "2px"
-                    }}>
-                      {task.category} • {new Date(task.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-                <div style={{
-                  width: "20px",
-                  height: "20px",
-                  borderRadius: "10px",
-                  backgroundColor: task.done ? "#34C759" : theme.border,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white",
-                  fontSize: "12px",
-                  fontWeight: "700"
-                }}>
-                  {task.done && "✓"}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  // Settings View
-  const SettingsView = () => (
-    <div style={{ 
-      padding: "20px", 
-      backgroundColor: theme.background,
-      color: theme.text,
-      minHeight: "100vh"
-    }}>
-      <div style={{ 
-        display: "flex", 
-        justifyContent: "space-between", 
-        alignItems: "center",
-        marginBottom: "30px"
-      }}>
-        <h2 style={{ 
-          fontSize: "32px", 
-          fontWeight: "700", 
-          margin: 0,
-          color: theme.text
-        }}>
-          ⚙️ Settings
-        </h2>
-        <button
-          onClick={() => setActiveFooterTab('today')}
-          style={{
-            background: "linear-gradient(135deg, #007AFF, #0051D2)",
-            border: "none",
-            fontSize: "16px",
-            color: "white",
-            cursor: "pointer",
-            padding: "10px 16px",
-            borderRadius: "12px",
-            fontWeight: "600"
-          }}
-        >
-          ← Back
-        </button>
-      </div>
-      
-      {/* Theme Toggle */}
-      <div 
-        style={{
-          background: isDark 
-            ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
-            : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
-          borderRadius: "16px",
-          padding: "20px",
-          marginBottom: "20px",
-          border: `1px solid ${theme.border}`,
-          boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.1)"
-        }}
-      >
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "space-between", 
-          alignItems: "center" 
-        }}>
-          <div>
-            <h3 style={{ 
-              fontSize: "18px", 
-              fontWeight: "600", 
-              marginBottom: "4px", 
-              color: theme.text 
-            }}>
-              🌙 Dark Mode
-            </h3>
-            <p style={{ 
-              fontSize: "14px", 
-              color: theme.textSecondary, 
-              margin: 0 
-            }}>
-              Switch between light and dark themes
-            </p>
-          </div>
-          <button
-            onClick={() => setIsDark(!isDark)}
-            style={{
-              width: "60px",
-              height: "32px",
-              borderRadius: "16px",
-              border: "none",
-              background: isDark ? "#34C759" : "#E5E7EB",
-              position: "relative",
-              cursor: "pointer",
-              transition: "all 0.3s ease"
-            }}
-          >
-            <div
-              style={{
-                width: "28px",
-                height: "28px",
-                borderRadius: "14px",
-                backgroundColor: "white",
-                position: "absolute",
-                top: "2px",
-                left: isDark ? "30px" : "2px",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-                transition: "all 0.3s ease"
-              }}
-            />
-          </button>
-        </div>
-      </div>
-
-      {/* Storage Info */}
-      <div 
-        style={{
-          background: isDark 
-            ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
-            : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
-          borderRadius: "16px",
-          padding: "20px",
-          marginBottom: "20px",
-          border: `1px solid ${theme.border}`,
-          boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.1)"
-        }}
-      >
-        <h3 style={{ 
-          fontSize: "18px", 
-          fontWeight: "600", 
-          marginBottom: "16px", 
-          color: theme.text,
-          display: "flex",
-          alignItems: "center",
-          gap: "8px"
-        }}>
-          💾 Storage Information
-        </h3>
-        <div style={{ fontSize: "15px", color: theme.textSecondary, lineHeight: "1.6" }}>
-          <div style={{ marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
-            <span>Tasks saved:</span>
-            <span style={{ fontWeight: "600", color: "#007AFF" }}>{taskList.length}</span>
-          </div>
-          <div style={{ marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
-            <span>Theme mode:</span>
-            <span style={{ fontWeight: "600", color: "#007AFF" }}>{isDark ? 'Dark' : 'Light'}</span>
-          </div>
-          <div style={{ marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
-            <span>Completed tasks:</span>
-            <span style={{ fontWeight: "600", color: "#34C759" }}>{taskList.filter(t => t.done).length}</span>
-          </div>
-          <div style={{ marginBottom: "12px", display: "flex", justifyContent: "space-between" }}>
-            <span>Last updated:</span>
-            <span style={{ fontWeight: "600", color: theme.text }}>{new Date().toLocaleTimeString()}</span>
-          </div>
-          <div style={{ 
-            fontSize: "13px", 
-            padding: "8px 12px", 
-            backgroundColor: isDark ? "#2C2C2E" : "#F0F0F0",
-            borderRadius: "8px",
-            textAlign: "center",
-            color: theme.textSecondary
-          }}>
-            📱 Data stored locally in your browser
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        {/* Export Data */}
-        <button 
-          onClick={() => {
-            const data = {
-              tasks: taskList,
-              theme: isDark,
-              exportDate: new Date().toISOString(),
-              totalTasks: taskList.length,
-              completedTasks: taskList.filter(t => t.done).length
-            };
-            const dataStr = JSON.stringify(data, null, 2);
-            const dataBlob = new Blob([dataStr], {type:'application/json'});
-            const url = URL.createObjectURL(dataBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `todo-backup-${new Date().toISOString().split('T')[0]}.json`;
-            link.click();
-            URL.revokeObjectURL(url);
-          }}
-          style={{
-            padding: "20px",
-            background: "linear-gradient(135deg, #34C759, #30D158)",
-            borderRadius: "16px",
-            border: "none",
-            textAlign: "left",
-            fontSize: "16px",
-            cursor: "pointer",
-            color: "white",
-            fontWeight: "600",
-            boxShadow: "0 4px 16px rgba(52, 199, 89, 0.3)",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            transition: "transform 0.2s ease"
-          }}
-          onMouseEnter={(e) => e.target.style.transform = "scale(1.02)"}
-          onMouseLeave={(e) => e.target.style.transform = "scale(1)"}
-        >
-          <span style={{ fontSize: "24px" }}>📤</span>
-          <div>
-            <div>Export Backup</div>
-            <div style={{ fontSize: "14px", opacity: 0.9, fontWeight: "400" }}>
-              Download your tasks as JSON file
-            </div>
-          </div>
-        </button>
-
-        {/* Clear All Data */}
-        <button 
-          onClick={() => {
-            const confirmed = window.confirm("⚠️ Clear all tasks and reset settings?\n\nThis action cannot be undone!");
-            if (confirmed) {
-              setTaskList([]);
-              setIsDark(false);
-            }
-          }}
-          style={{
-            padding: "20px",
-            background: "linear-gradient(135deg, #FF3B30, #FF6B6B)",
-            borderRadius: "16px",
-            border: "none",
-            textAlign: "left",
-            fontSize: "16px",
-            cursor: "pointer",
-            color: "white",
-            fontWeight: "600",
-            boxShadow: "0 4px 16px rgba(255, 59, 48, 0.3)",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            transition: "transform 0.2s ease"
-          }}
-          onMouseEnter={(e) => e.target.style.transform = "scale(1.02)"}
-          onMouseLeave={(e) => e.target.style.transform = "scale(1)"}
-        >
-          <span style={{ fontSize: "24px" }}>🗑️</span>
-          <div>
-            <div>Clear All Data</div>
-            <div style={{ fontSize: "14px", opacity: 0.9, fontWeight: "400" }}>
-              Remove all tasks and reset app
-            </div>
-          </div>
-        </button>
-        
-        {/* App Info */}
-        <div 
-          style={{
-            padding: "20px",
-            background: isDark 
-              ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
-              : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
-            borderRadius: "16px",
-            border: `1px solid ${theme.border}`,
-            textAlign: "center",
-            fontSize: "16px",
-            color: theme.text,
-            boxShadow: isDark ? "0 4px 16px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.1)"
-          }}
-        >
-          <div style={{ fontSize: "48px", marginBottom: "12px" }}>✨</div>
-          <div style={{ fontWeight: "700", marginBottom: "8px" }}>Todo App v2.0.0</div>
-          <div style={{ fontSize: "14px", color: theme.textSecondary, lineHeight: "1.5" }}>
-            Enhanced iOS-style design<br/>
-            Auto-save enabled • {taskList.length} tasks stored<br/>
-            <span style={{ fontSize: "12px", opacity: 0.8 }}>
-              Built with React & Framer Motion
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   // Render tab content
   const renderTabContent = () => {
     switch(activeFooterTab) {
-      case 'stats': return <StatsView />;
-      case 'calendar': return <CalendarView />;
-      case 'settings': return <SettingsView />;
+      case 'stats': 
+        return (
+          <Stats 
+            theme={theme}
+            taskList={taskList}
+            categories={categories}
+            getTasksByCategory={getTasksByCategory}
+            onBack={() => setActiveFooterTab('today')}
+          />
+        );
+      case 'calendar': 
+        return (
+          <Calendar 
+            theme={theme}
+            currentTime={currentTime}
+            taskList={taskList}
+            categories={categories}
+            onBack={() => setActiveFooterTab('today')}
+            handleAddTask={(newTask) => setTaskList([...taskList, newTask])}
+            toggleTaskDone={toggleDone}
+          />
+        );
+      case 'settings': 
+        return (
+          <Settings 
+            theme={theme}
+            taskList={taskList}
+            isDark={isDark}
+            setIsDark={setIsDark}
+            setTaskList={setTaskList}
+            onBack={() => setActiveFooterTab('today')}
+          />
+        );
       default: return null;
     }
   };
@@ -830,7 +217,8 @@ useEffect(() => {
         : "linear-gradient(135deg, #F8F9FA 0%, #E3F2FD 100%)",
       fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       padding: "0",
-      position: "relative"
+      position: "relative",
+      overflow: "hidden"
     }}>
       {/* Status Bar */}
       <div style={{
@@ -840,7 +228,8 @@ useEffect(() => {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        color: theme.statusBar
+        color: theme.statusBar,
+        backgroundColor: theme.background
       }}>
         <span>
           {currentTime.toLocaleTimeString('en-US', {
@@ -864,30 +253,26 @@ useEffect(() => {
       </div>
 
       {/* Greeting */}
-      <h2 
-        style={{ 
-          marginLeft: "20px",
-          fontFamily: "'Nunito', -apple-system, BlinkMacSystemFont, sans-serif",
-          fontSize: "28px",
-          fontWeight: "700",
-          lineHeight: "1.2",
-          marginBottom: "8px",
-          marginTop: "16px",
-          color: isDark ? "#FFFFFF" : "#1a1a1a"
-        }}
-      >
-        Hi Ella 👋
+      <h2 style={{ 
+        marginLeft: "20px",
+        fontFamily: "'Nunito', -apple-system, BlinkMacSystemFont, sans-serif",
+        fontSize: "28px",
+        fontWeight: "700",
+        lineHeight: "1.2",
+        marginBottom: "8px",
+        marginTop: "16px",
+        color: isDark ? "#FFFFFF" : "#1a1a1a"
+      }}>
+        Hi Ella(Dr.) 👋👩‍⚕️
       </h2>
 
       {/* Header */}
-      <div
-        style={{
-          padding: "20px 20px 0 20px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start"
-        }}
-      >
+      <div style={{
+        padding: "20px 20px 0 20px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start"
+      }}>
         <div>
           <h1 style={{
             fontSize: "34px",
@@ -929,15 +314,13 @@ useEffect(() => {
       </div>
 
       {/* Category Stats */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "16px",
-          padding: "24px 20px"
-        }}
-      >
-        {Object.entries(categories).map(([category, config], index) => {
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "16px",
+        padding: "24px 20px"
+      }}>
+        {Object.entries(categories).map(([category, config]) => {
           const categoryTasks = getTasksByCategory(category);
           const count = categoryTasks.length;
           const completed = categoryTasks.filter(t => t.done).length;
@@ -981,10 +364,7 @@ useEffect(() => {
               }}>
                 {percentage}%
               </div>
-              <div style={{
-                fontSize: "32px",
-                marginBottom: "8px"
-              }}>
+              <div style={{ fontSize: "32px", marginBottom: "8px" }}>
                 {config.icon}
               </div>
               <div>
@@ -1018,22 +398,20 @@ useEffect(() => {
       </div>
 
       {/* Task List */}
-      <div style={{ padding: "0 20px" }}>
+      <div style={{ padding: "0 20px" }} onClick={() => setSwipedTask(null)}>
         <AnimatePresence>
           {taskList.length === 0 ? (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "60px 20px",
-                color: theme.textSecondary,
-                background: isDark 
-                  ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
-                  : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
-                borderRadius: "24px",
-                border: `1px solid ${theme.border}`,
-                boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.1)"
-              }}
-            >
+            <div style={{
+              textAlign: "center",
+              padding: "60px 20px",
+              color: theme.textSecondary,
+              background: isDark 
+                ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
+                : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
+              borderRadius: "24px",
+              border: `1px solid ${theme.border}`,
+              boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 4px 20px rgba(0,0,0,0.1)"
+            }}>
               <div style={{ fontSize: "64px", marginBottom: "20px" }}>📝</div>
               <p style={{ fontSize: "20px", margin: "0", fontWeight: "600" }}>No tasks yet</p>
               <p style={{ fontSize: "16px", margin: "12px 0 0 0", opacity: 0.7 }}>
@@ -1043,7 +421,7 @@ useEffect(() => {
           ) : (
             taskList
               .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-              .map((task, index) => (
+              .map((task) => (
                 <motion.div
                   key={task.id}
                   variants={taskVariants}
@@ -1051,6 +429,16 @@ useEffect(() => {
                   animate="visible"
                   exit="exit"
                   layout
+                  drag="x"
+                  dragConstraints={{ left: -80, right: 0 }}
+                  dragElastic={0.1}
+                  onDragEnd={(event, info) => {
+                    if (info.offset.x < -60) {
+                      setSwipedTask(task.id);
+                    } else {
+                      setSwipedTask(null);
+                    }
+                  }}
                   style={{
                     background: isDark 
                       ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
@@ -1063,8 +451,11 @@ useEffect(() => {
                       : "0 2px 12px rgba(0,0,0,0.1)",
                     border: `1px solid ${theme.border}`,
                     position: "relative",
-                    overflow: "hidden"
+                    overflow: "visible",
+                    cursor: "grab",
+                    zIndex: 1
                   }}
+                  whileDrag={{ cursor: "grabbing", scale: 1.02, zIndex: 10 }}
                 >
                   {/* Category color strip */}
                   <div style={{
@@ -1075,6 +466,44 @@ useEffect(() => {
                     width: "4px",
                     background: `linear-gradient(to bottom, ${categories[task.category]?.color}, ${categories[task.category]?.color}80)`
                   }} />
+
+                  {/* Swipe Delete Button */}
+                  <AnimatePresence>
+                    {swipedTask === task.id && (
+                      <motion.div
+                        initial={{ x: 100, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: 100, opacity: 0 }}
+                        transition={{ type: "spring", damping: 20, stiffness: 300 }}
+                        style={{
+                          position: "absolute",
+                          right: "-80px",
+                          top: 0,
+                          bottom: 0,
+                          width: "80px",
+                          background: "linear-gradient(135deg, #FF3B30, #FF6B6B)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: "0 16px 16px 0",
+                          cursor: "pointer",
+                          boxShadow: "-2px 0 8px rgba(255, 59, 48, 0.3)"
+                        }}
+                        onClick={() => {
+                          handleDelete(task);
+                          setSwipedTask(null);
+                        }}
+                      >
+                        <div style={{
+                          color: "white",
+                          fontSize: "24px",
+                          fontWeight: "600"
+                        }}>
+                          🗑️
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {editTask?.id === task.id ? (
                     /* Edit Mode */
@@ -1215,20 +644,24 @@ useEffect(() => {
                         >
                           ✏️
                         </button>
+                        
                         <button
-                          onClick={() => handleDelete(task)}
+                          onClick={() => {
+                            setActiveTask(task);
+                            setShowTimer(true);
+                          }}
                           style={{
-                            background: "linear-gradient(135deg, #FF3B30, #FF6B6B)",
+                            background: "linear-gradient(135deg, #FF9500, #FFB340)",
                             border: "none",
                             fontSize: "14px",
                             cursor: "pointer",
                             padding: "8px",
                             borderRadius: "8px",
                             color: "white",
-                            boxShadow: "0 2px 8px rgba(255, 59, 48, 0.3)"
+                            boxShadow: "0 2px 8px rgba(255, 149, 0, 0.3)"
                           }}
                         >
-                          🗑️
+                          ⏰
                         </button>
                       </div>
                     </div>
@@ -1240,180 +673,18 @@ useEffect(() => {
       </div>
 
       {/* Add Task Modal */}
-      <AnimatePresence>
-        {showAddTask && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "rgba(0,0,0,0.6)",
-              display: "flex",
-              alignItems: "flex-end",
-              zIndex: 1000,
-              backdropFilter: "blur(10px)"
-            }}
-            onClick={() => setShowAddTask(false)}
-          >
-            <motion.div
-              initial={{ y: 400 }}
-              animate={{ y: 0 }}
-              exit={{ y: 400 }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                background: isDark 
-                  ? "linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%)"
-                  : "linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)",
-                borderTopLeftRadius: "28px",
-                borderTopRightRadius: "28px",
-                padding: "28px 24px 40px 24px",
-                width: "100%",
-                maxHeight: "75vh",
-                boxShadow: isDark ? "0 -8px 32px rgba(0,0,0,0.4)" : "0 -4px 20px rgba(0,0,0,0.1)"
-              }}
-            >
-              <div 
-                style={{
-                  width: "40px",
-                  height: "4px",
-                  background: theme.border,
-                  borderRadius: "2px",
-                  margin: "0 auto 28px auto"
-                }} 
-              />
-
-              <h2 style={{
-                fontSize: "28px",
-                fontWeight: "700",
-                margin: "0 0 24px 0",
-                color: theme.text,
-                textAlign: "center"
-              }}>
-                 Add New Task
-              </h2>
-
-              <input
-                type="text"
-                value={task}
-                onChange={(e) => setTask(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                placeholder="What needs to be done?"
-                style={{
-                  width: "100%",
-                  padding: "20px",
-                  borderRadius: "16px",
-                  border: `2px solid ${theme.border}`,
-                  background: isDark ? "#2C2C2E" : "#F8F9FA",
-                  color: theme.text,
-                  fontSize: "18px",
-                  outline: "none",
-                  marginBottom: "24px",
-                  fontFamily: "inherit",
-                  boxSizing: "border-box",
-                  transition: "all 0.3s ease"
-                }}
-                autoFocus
-              />
-
-              <div style={{ marginBottom: "28px" }}>
-                <div 
-                  style={{
-                    fontSize: "18px",
-                    fontWeight: "600",
-                    marginBottom: "16px",
-                    color: theme.text
-                  }}
-                >
-                  🏷️ Choose Category
-                </div>
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "12px"
-                }}>
-                  {Object.entries(categories).map(([category, config]) => (
-                    <button
-                      key={category}
-                      onClick={() => setSelectedCategory(category)}
-                      style={{
-                        padding: "16px",
-                        borderRadius: "16px",
-                        border: selectedCategory === category 
-                          ? `2px solid ${config.color}` 
-                          : `1px solid ${theme.border}`,
-                        background: selectedCategory === category 
-                          ? (isDark ? `${config.color}20` : config.bgColor)
-                          : (isDark ? "#2C2C2E" : "#FFFFFF"),
-                        color: theme.text,
-                        fontSize: "16px",
-                        fontWeight: selectedCategory === category ? "600" : "500",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        transition: "all 0.3s ease",
-                        boxShadow: selectedCategory === category 
-                          ? `0 4px 16px ${config.color}30`
-                          : "none"
-                      }}
-                    >
-                      <span style={{ fontSize: "20px" }}>{config.icon}</span>
-                      {category}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "16px" }}>
-                <button
-                  onClick={() => setShowAddTask(false)}
-                  style={{
-                    flex: 1,
-                    padding: "18px",
-                    borderRadius: "16px",
-                    border: `1px solid ${theme.border}`,
-                    background: isDark ? "#2C2C2E" : "#F8F9FA",
-                    color: theme.text,
-                    fontSize: "18px",
-                    fontWeight: "600",
-                    cursor: "pointer",
-                    transition: "all 0.3s ease"
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAdd}
-                  disabled={!task.trim()}
-                  style={{
-                    flex: 1,
-                    padding: "18px",
-                    borderRadius: "16px",
-                    border: "none",
-                    background: task.trim() 
-                      ? "linear-gradient(135deg, #007AFF, #0051D2)"
-                      : "#C7C7CC",
-                    color: "white",
-                    fontSize: "18px",
-                    fontWeight: "600",
-                    cursor: task.trim() ? "pointer" : "not-allowed",
-                    transition: "all 0.3s ease",
-                    boxShadow: task.trim() ? "0 4px 16px rgba(0, 122, 255, 0.3)" : "none"
-                  }}
-                >
-                  Add Task
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <AddTaskModal
+        showAddTask={showAddTask}
+        setShowAddTask={setShowAddTask}
+        task={task}
+        setTask={setTask}
+        handleAdd={handleAdd}
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+        categories={categories}
+        theme={theme}
+        isDark={isDark}
+      />
 
       {/* Floating Add Button */}
       <button
@@ -1435,7 +706,7 @@ useEffect(() => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          zIndex: 100,
+          zIndex: 1001,
           transition: "all 0.3s ease"
         }}
         onMouseEnter={(e) => e.target.style.transform = "scale(1.1)"}
@@ -1445,21 +716,19 @@ useEffect(() => {
       </button>
 
       {/* Footer Navigation */}
-      <div
-        style={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: isDark 
-            ? "rgba(28, 28, 30, 0.95)" 
-            : "rgba(255, 255, 255, 0.95)",
-          backdropFilter: "blur(20px)",
-          borderTop: `1px solid ${theme.border}`,
-          padding: "12px 0 28px 0",
-          zIndex: 50
-        }}
-      >
+      <div style={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: isDark 
+          ? "#000000" 
+          : "rgba(255, 255, 255, 0.95)",
+        backdropFilter: "blur(20px)",
+        borderTop: `1px solid ${theme.border}`,
+        padding: "12px 0 28px 0",
+        zIndex: 50
+      }}>
         {/* Quick Stats */}
         <div style={{
           display: "flex",
@@ -1571,7 +840,21 @@ useEffect(() => {
 
       {/* Confetti Animation */}
       <AnimatePresence>
-        {showConfetti && <ConfettiEffect />}
+        {showConfetti && <Confetti />}
+      </AnimatePresence>
+
+      {/* Timer Modal */}
+      <AnimatePresence>
+        {showTimer && (
+          <Timer 
+            theme={theme}
+            taskName={activeTask?.text}
+            onClose={() => {
+              setShowTimer(false);
+              setActiveTask(null);
+            }}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
